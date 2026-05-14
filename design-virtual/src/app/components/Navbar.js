@@ -12,16 +12,22 @@ export default function Navbar() {
     useEffect(() => {
         const logged = localStorage.getItem("isLoggedIn");
         const email = localStorage.getItem("userEmail");
+        const token = localStorage.getItem("token");
 
-        if (logged === "true") {
+        if (logged === "true" && token) {
             setIsLoggedIn(true);
             setUserEmail(email || "");
+        } else {
+            setIsLoggedIn(false);
+            setUserEmail("");
         }
     }, []);
 
     function handleLogout() {
         localStorage.removeItem("isLoggedIn");
         localStorage.removeItem("userEmail");
+        localStorage.removeItem("userName");
+        localStorage.removeItem("token");
 
         setIsLoggedIn(false);
         setUserEmail("");
@@ -163,6 +169,9 @@ export default function Navbar() {
           font-weight: 800;
           font-size: 13px;
           color: #333;
+          max-width: 190px;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         @media (max-width: 1000px) {

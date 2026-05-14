@@ -14,7 +14,9 @@ export default function Home() {
 
   useEffect(() => {
     const logged = localStorage.getItem("isLoggedIn");
-    setIsLoggedIn(logged === "true");
+    const token = localStorage.getItem("token");
+
+    setIsLoggedIn(logged === "true" && !!token);
   }, []);
 
   function handleUpload(e) {
