@@ -44,9 +44,9 @@ export default function Navbar() {
 
             <div className="navLinks">
                 <Link href="/">Home</Link>
-                <Link href="/rezultate">Rezultate</Link>
-                <Link href="/produse">Produse</Link>
-                <Link href="/abonamente">Abonamente</Link>
+                <Link href="/rezultate">Results</Link>
+                <Link href="/produse">Products</Link>
+                <Link href="/abonamente">Subscriptions</Link>
                 <Link href="/about">About</Link>
             </div>
 
