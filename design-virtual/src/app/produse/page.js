@@ -1,65 +1,86 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Navbar from "../components/Navbar";
 
+const API_URL = "http://localhost:8080";
+
 export default function Produse() {
-    const products = [
-        {
-            name: "Canapea IKEA",
-            price: "1499 lei",
-            store: "IKEA",
-            category: "Mobilier",
-            description:
-                "Canapea potrivită pentru un living modern, confortabilă și ușor de integrat în diferite stiluri de amenajare.",
-            icon: "🛋️",
-        },
-        {
-            name: "Masă Dedeman",
-            price: "349 lei",
-            store: "Dedeman",
-            category: "Mobilier",
-            description:
-                "Masă practică pentru living sau dining, potrivită pentru amenajări simple, moderne sau minimaliste.",
-            icon: "🪑",
-        },
-        {
-            name: "Lampă IKEA",
-            price: "199 lei",
-            store: "IKEA",
-            category: "Iluminat",
-            description:
-                "Lampă decorativă care poate îmbunătăți atmosfera camerei și poate completa designul interior ales.",
-            icon: "💡",
-        },
-        {
-            name: "Covor decorativ",
-            price: "249 lei",
-            store: "Dedeman",
-            category: "Decor",
-            description:
-                "Covor potrivit pentru a adăuga căldură, textură și un aspect mai primitor camerei.",
-            icon: "🧶",
-        },
-        {
-            name: "Plantă artificială",
-            price: "89 lei",
-            store: "IKEA",
-            category: "Decor",
-            description:
-                "Element decorativ ușor de întreținut, ideal pentru a adăuga prospețime și culoare spațiului.",
-            icon: "🌿",
-        },
-        {
-            name: "Tablou decorativ",
-            price: "129 lei",
-            store: "Dedeman",
-            category: "Decor",
-            description:
-                "Accesoriu vizual care poate completa stilul ales și poate oferi personalitate camerei.",
-            icon: "🖼️",
-        },
-    ];
+    const [products, setProducts] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [errorMessage, setErrorMessage] = useState("");
+
+    useEffect(() => {
+        async function fetchProducts() {
+            const token = localStorage.getItem("token");
+            const idsFromStorage = localStorage.getItem("productIds");
+
+            if (!token) {
+                setErrorMessage("Trebuie să fii autentificat pentru a vedea produsele.");
+                setLoading(false);
+                return;
+            }
+
+            if (!idsFromStorage) {
+                setErrorMessage("Nu există produse recomandate momentan.");
+                setLoading(false);
+                return;
+            }
+
+            let ids = [];
+
+            try {
+                ids = JSON.parse(idsFromStorage);
+            } catch {
+                ids = [];
+            }
+
+            if (!ids.length) {
+                setErrorMessage("Nu există produse recomandate momentan.");
+                setLoading(false);
+                return;
+            }
+
+            try {
+                const response = await fetch(
+                    `${API_URL}/api/products?ids=${ids.join(",")}`,
+                    {
+                        method: "GET",
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    }
+                );
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || "Produsele nu au putut fi încărcate.");
+                }
+
+                setProducts(data);
+            } catch (error) {
+                setErrorMessage(
+                    error.message || "A apărut o eroare la încărcarea produselor."
+                );
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        fetchProducts();
+    }, []);
+
+    function getImageUrl(imageUrl) {
+        if (!imageUrl) return "";
+
+        if (imageUrl.startsWith("http")) {
+            return imageUrl;
+        }
+
+        return `${API_URL}${imageUrl}`;
+    }
 
     return (
         <main className="page">
@@ -71,35 +92,84 @@ export default function Produse() {
                 <h1>Produse recomandate 🛒</h1>
 
                 <p>
-                    Aici sunt afișate produse care pot completa designul interior generat.
-                    Lista poate include mobilier, corpuri de iluminat și elemente
-                    decorative potrivite pentru stilul ales.
+                    Aici sunt afișate produsele sugerate pentru designul generat.
                 </p>
             </section>
 
-            <section className="productsGrid">
-                {products.map((product, index) => (
-                    <div className="productCard" key={index}>
-                        <div className="productTop">
-                            <div className="productIcon">{product.icon}</div>
+            {loading && (
+                <section className="messageCard">
+                    <h2>Se încarcă produsele...</h2>
+                    <p>Te rugăm să aștepți câteva secunde.</p>
+                </section>
+            )}
 
-                            <span className="storeBadge">{product.store}</span>
+            {!loading && errorMessage && (
+                <section className="messageCard">
+                    <h2>Nu există produse de afișat</h2>
+                    <p>{errorMessage}</p>
+
+                    <Link href="/" className="primaryAction">
+                        Generează un design
+                    </Link>
+                </section>
+            )}
+
+            {!loading && !errorMessage && (
+                <section className="productsGrid">
+                    {products.map((product) => (
+                        <div className="productCard" key={product.id}>
+                            <div className="productImageBox">
+                                {product.imageUrl ? (
+                                    <img
+                                        src={getImageUrl(product.imageUrl)}
+                                        alt={product.name}
+                                        className="productImage"
+                                    />
+                                ) : (
+                                    <div className="productIcon">🛋️</div>
+                                )}
+                            </div>
+
+                            <div className="productInfo">
+                <span className="storeBadge">
+                  {product.storeName || "Magazin"}
+                </span>
+
+                                <h2>{product.name}</h2>
+
+                                <p className="category">
+                                    {product.category || "Produs recomandat"}
+                                </p>
+
+                                <p className="description">
+                                    {product.description || "Produs potrivit pentru amenajare."}
+                                </p>
+
+                                <div className="dimensions">
+                                    {product.width && <span>Lățime: {product.width} cm</span>}
+                                    {product.height && <span>Înălțime: {product.height} cm</span>}
+                                </div>
+
+                                <div className="productBottom">
+                                    <strong>{product.price} lei</strong>
+
+                                    {product.productUrl ? (
+                                        <a
+                                            href={product.productUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                        >
+                                            Vezi produsul
+                                        </a>
+                                    ) : (
+                                        <button type="button">Vezi produsul</button>
+                                    )}
+                                </div>
+                            </div>
                         </div>
-
-                        <h2>{product.name}</h2>
-
-                        <p className="category">{product.category}</p>
-
-                        <p className="description">{product.description}</p>
-
-                        <div className="productBottom">
-                            <strong>{product.price}</strong>
-
-                            <button type="button">Vezi produsul</button>
-                        </div>
-                    </div>
-                ))}
-            </section>
+                    ))}
+                </section>
+            )}
 
             <section className="bottomActions">
                 <Link href="/rezultate" className="secondaryAction">
@@ -112,212 +182,243 @@ export default function Produse() {
             </section>
 
             <style jsx>{`
-        .page {
-          min-height: 100vh;
-          padding: 34px 58px;
-          font-family: Arial, sans-serif;
-          color: #111;
-          background:
-            radial-gradient(circle at top left, rgba(255, 255, 255, 0.95), transparent 35%),
-            radial-gradient(circle at top right, rgba(255, 223, 180, 0.8), transparent 30%),
-            linear-gradient(135deg, #f4eadb, #c9b08d);
-        }
+                .page {
+                    min-height: 100vh;
+                    padding: 34px 58px;
+                    font-family: Arial, sans-serif;
+                    color: #111;
+                    background:
+                            radial-gradient(circle at top left, rgba(255, 255, 255, 0.95), transparent 35%),
+                            radial-gradient(circle at top right, rgba(255, 223, 180, 0.8), transparent 30%),
+                            linear-gradient(135deg, #f4eadb, #c9b08d);
+                }
 
-        .hero {
-          background: rgba(255, 255, 255, 0.72);
-          border-radius: 34px;
-          padding: 44px;
-          text-align: center;
-          box-shadow: 0 24px 60px rgba(0, 0, 0, 0.12);
-          margin-bottom: 30px;
-        }
+                .hero {
+                    background: rgba(255, 255, 255, 0.72);
+                    border-radius: 34px;
+                    padding: 44px;
+                    text-align: center;
+                    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.12);
+                    margin-bottom: 30px;
+                }
 
-        .tag {
-          display: inline-block;
-          background: #111;
-          color: white;
-          padding: 9px 16px;
-          border-radius: 999px;
-          font-size: 13px;
-          font-weight: 800;
-          margin-bottom: 18px;
-          text-transform: uppercase;
-          letter-spacing: 1px;
-        }
+                .tag {
+                    display: inline-block;
+                    background: #111;
+                    color: white;
+                    padding: 9px 16px;
+                    border-radius: 999px;
+                    font-size: 13px;
+                    font-weight: 800;
+                    margin-bottom: 18px;
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
+                }
 
-        .hero h1 {
-          font-size: 42px;
-          margin: 0 0 14px;
-        }
+                .hero h1 {
+                    font-size: 42px;
+                    margin: 0 0 14px;
+                }
 
-        .hero p {
-          max-width: 800px;
-          margin: 0 auto;
-          font-size: 18px;
-          line-height: 1.6;
-          color: #333;
-        }
+                .hero p {
+                    max-width: 800px;
+                    margin: 0 auto;
+                    font-size: 18px;
+                    line-height: 1.6;
+                    color: #333;
+                }
 
-        .productsGrid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 24px;
-          margin-bottom: 34px;
-        }
+                .messageCard {
+                    background: rgba(255, 255, 255, 0.82);
+                    border-radius: 30px;
+                    padding: 34px;
+                    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.1);
+                    margin-bottom: 30px;
+                    text-align: center;
+                }
 
-        .productCard {
-          background: rgba(255, 255, 255, 0.82);
-          border-radius: 28px;
-          padding: 26px;
-          box-shadow: 0 18px 45px rgba(0, 0, 0, 0.1);
-          transition: 0.2s;
-          min-height: 310px;
-          display: flex;
-          flex-direction: column;
-        }
+                .messageCard h2 {
+                    margin: 0 0 10px;
+                    font-size: 30px;
+                }
 
-        .productCard:hover {
-          transform: translateY(-6px);
-          box-shadow: 0 24px 55px rgba(0, 0, 0, 0.14);
-        }
+                .messageCard p {
+                    color: #555;
+                    font-size: 17px;
+                    margin-bottom: 20px;
+                }
 
-        .productTop {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 18px;
-        }
+                .productsGrid {
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 24px;
+                    margin-bottom: 34px;
+                }
 
-        .productIcon {
-          width: 64px;
-          height: 64px;
-          border-radius: 22px;
-          background: linear-gradient(135deg, #ffffff, #f3eadf);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 34px;
-          box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
-        }
+                .productCard {
+                    background: rgba(255, 255, 255, 0.82);
+                    border-radius: 28px;
+                    overflow: hidden;
+                    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.1);
+                    transition: 0.2s;
+                    display: flex;
+                    flex-direction: column;
+                }
 
-        .storeBadge {
-          background: #111;
-          color: white;
-          padding: 8px 13px;
-          border-radius: 999px;
-          font-size: 12px;
-          font-weight: 800;
-          text-transform: uppercase;
-        }
+                .productCard:hover {
+                    transform: translateY(-6px);
+                    box-shadow: 0 24px 55px rgba(0, 0, 0, 0.14);
+                }
 
-        .productCard h2 {
-          font-size: 24px;
-          margin: 0 0 8px;
-        }
+                .productImageBox {
+                    height: 210px;
+                    background: linear-gradient(135deg, #ffffff, #f3eadf);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
 
-        .category {
-          color: #8a5a2b;
-          font-weight: 800;
-          margin: 0 0 14px;
-        }
+                .productImage {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: contain;
+                    padding: 18px;
+                }
 
-        .description {
-          color: #555;
-          line-height: 1.6;
-          margin: 0 0 22px;
-          flex: 1;
-        }
+                .productIcon {
+                    font-size: 70px;
+                }
 
-        .productBottom {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 14px;
-          margin-top: auto;
-        }
+                .productInfo {
+                    padding: 24px;
+                    display: flex;
+                    flex-direction: column;
+                    flex: 1;
+                }
 
-        .productBottom strong {
-          font-size: 22px;
-        }
+                .storeBadge {
+                    background: #111;
+                    color: white;
+                    padding: 8px 13px;
+                    border-radius: 999px;
+                    font-size: 12px;
+                    font-weight: 800;
+                    width: fit-content;
+                    margin-bottom: 14px;
+                    text-transform: uppercase;
+                }
 
-        button {
-          border: none;
-          border-radius: 16px;
-          background: #111;
-          color: white;
-          padding: 13px 18px;
-          font-weight: 900;
-          cursor: pointer;
-          transition: 0.2s;
-        }
+                .productInfo h2 {
+                    font-size: 24px;
+                    margin: 0 0 8px;
+                }
 
-        button:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 12px 25px rgba(0, 0, 0, 0.18);
-        }
+                .category {
+                    color: #8a5a2b;
+                    font-weight: 800;
+                    margin: 0 0 14px;
+                }
 
-        .bottomActions {
-          display: flex;
-          justify-content: center;
-          gap: 16px;
-          flex-wrap: wrap;
-          margin-bottom: 30px;
-        }
+                .description {
+                    color: #555;
+                    line-height: 1.6;
+                    margin: 0 0 16px;
+                    flex: 1;
+                }
 
-        .bottomActions :global(a) {
-          text-decoration: none;
-          padding: 15px 24px;
-          border-radius: 18px;
-          font-weight: 900;
-          transition: 0.2s;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-        }
+                .dimensions {
+                    display: flex;
+                    gap: 10px;
+                    flex-wrap: wrap;
+                    margin-bottom: 18px;
+                }
 
-        .bottomActions :global(.primaryAction) {
-          background: #111;
-          color: white;
-          box-shadow: 0 12px 25px rgba(0, 0, 0, 0.18);
-        }
+                .dimensions span {
+                    background: white;
+                    border-radius: 999px;
+                    padding: 7px 11px;
+                    font-size: 13px;
+                    font-weight: 700;
+                    color: #555;
+                }
 
-        .bottomActions :global(.secondaryAction) {
-          background: white;
-          color: #111;
-          border: 1px solid #ddd;
-          box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
-        }
+                .productBottom {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    gap: 14px;
+                    margin-top: auto;
+                }
 
-        .bottomActions :global(a:hover) {
-          transform: translateY(-3px);
-          box-shadow: 0 14px 28px rgba(0, 0, 0, 0.16);
-        }
+                .productBottom strong {
+                    font-size: 22px;
+                }
 
-        @media (max-width: 1000px) {
-          .productsGrid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-        }
+                .productBottom a,
+                .productBottom button,
+                .primaryAction,
+                .secondaryAction {
+                    text-decoration: none;
+                    border: none;
+                    border-radius: 16px;
+                    background: #111;
+                    color: white;
+                    padding: 13px 18px;
+                    font-weight: 900;
+                    cursor: pointer;
+                    transition: 0.2s;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                }
 
-        @media (max-width: 700px) {
-          .page {
-            padding: 24px;
-          }
+                .productBottom a:hover,
+                .productBottom button:hover,
+                .primaryAction:hover,
+                .secondaryAction:hover {
+                    transform: translateY(-3px);
+                    box-shadow: 0 12px 25px rgba(0, 0, 0, 0.18);
+                }
 
-          .hero h1 {
-            font-size: 34px;
-          }
+                .bottomActions {
+                    display: flex;
+                    justify-content: center;
+                    gap: 16px;
+                    flex-wrap: wrap;
+                    margin-bottom: 30px;
+                }
 
-          .productsGrid {
-            grid-template-columns: 1fr;
-          }
+                .secondaryAction {
+                    background: white;
+                    color: #111;
+                    border: 1px solid #ddd;
+                }
 
-          .productBottom {
-            flex-direction: column;
-            align-items: flex-start;
-          }
-        }
-      `}</style>
+                @media (max-width: 1000px) {
+                    .productsGrid {
+                        grid-template-columns: repeat(2, 1fr);
+                    }
+                }
+
+                @media (max-width: 700px) {
+                    .page {
+                        padding: 24px;
+                    }
+
+                    .hero h1 {
+                        font-size: 34px;
+                    }
+
+                    .productsGrid {
+                        grid-template-columns: 1fr;
+                    }
+
+                    .productBottom {
+                        flex-direction: column;
+                        align-items: flex-start;
+                    }
+                }
+            `}</style>
         </main>
     );
 }

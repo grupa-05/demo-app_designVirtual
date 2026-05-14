@@ -4,13 +4,17 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "./components/Navbar";
 
+const API_URL = "http://localhost:8080";
+
 export default function Home() {
   const router = useRouter();
 
-  const [image, setImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [style, setStyle] = useState("Modern");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authMessage, setAuthMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const logged = localStorage.getItem("isLoggedIn");
@@ -24,11 +28,14 @@ export default function Home() {
     if (!file) return;
 
     const imageUrl = URL.createObjectURL(file);
-    setImage(imageUrl);
+
+    setSelectedFile(file);
+    setImagePreview(imageUrl);
   }
 
   function handleDeleteImage() {
-    setImage(null);
+    setImagePreview(null);
+    setSelectedFile(null);
 
     const input = document.getElementById("room-image-input");
     if (input) {
@@ -36,7 +43,7 @@ export default function Home() {
     }
   }
 
-  function handleGenerate() {
+  async function handleGenerate() {
     if (!isLoggedIn) {
       setAuthMessage(
           "Pentru a genera un design, trebuie mai întâi să te autentifici sau să îți creezi un cont."
@@ -49,13 +56,56 @@ export default function Home() {
       return;
     }
 
-    if (!image) {
+    if (!selectedFile) {
       alert("Încarcă mai întâi o imagine.");
       return;
     }
 
-    localStorage.setItem("selectedStyle", style);
-    router.push("/rezultate");
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setAuthMessage("");
+
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+
+      const response = await fetch(`${API_URL}/api/furniture/generate-multiple`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Generarea designului a eșuat.");
+      }
+
+      if (!data.image) {
+        throw new Error("Backend-ul nu a trimis imaginea generată.");
+      }
+
+      localStorage.setItem("selectedStyle", style);
+      localStorage.setItem("generatedImage", data.image);
+      localStorage.setItem(
+          "productIds",
+          JSON.stringify(data.productIds || [])
+      );
+
+      router.push("/rezultate");
+    } catch (error) {
+      alert(error.message || "A apărut o eroare la generarea designului.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -120,8 +170,7 @@ export default function Home() {
             <span>Generator AI</span>
             <h2>Creează designul camerei tale</h2>
             <p>
-              Urmează cei doi pași simpli și pregătește imaginea pentru generarea
-              designului interior.
+              Încarcă imaginea camerei și alege stilul de amenajare dorit.
             </p>
           </div>
 
@@ -152,7 +201,7 @@ export default function Home() {
               </p>
 
               <label className="uploadBox">
-                <span className="uploadIcon">📷</span>
+                <span>📷</span>
                 <span>Alege imaginea</span>
                 <input
                     id="room-image-input"
@@ -162,13 +211,13 @@ export default function Home() {
                 />
               </label>
 
-              {image ? (
+              {imagePreview ? (
                   <div className="uploadedStatus">
                     <div className="statusIcon">✓</div>
 
                     <div className="statusText">
                       <strong>Imagine încărcată</strong>
-                      <span>Poza este pregătită pentru generarea designului.</span>
+                      <span>Poza este pregătită pentru generare.</span>
                     </div>
 
                     <button
@@ -204,14 +253,18 @@ export default function Home() {
 
                 <button
                     type="button"
-                    disabled={!image}
+                    disabled={!selectedFile || loading}
                     onClick={handleGenerate}
                 >
-                  {isLoggedIn ? "Generează design AI ✨" : "Login pentru generare"}
+                  {loading
+                      ? "Se generează..."
+                      : isLoggedIn
+                          ? "Generează design AI ✨"
+                          : "Login pentru generare"}
                 </button>
               </div>
 
-              {!image && (
+              {!selectedFile && (
                   <p className="warning">
                     Încarcă mai întâi o imagine pentru a activa generarea.
                   </p>
@@ -232,24 +285,19 @@ export default function Home() {
             <div className="infoCard">
               <div className="infoIcon">📷</div>
               <h3>Încarci imaginea</h3>
-              <p>Utilizatorul adaugă o fotografie cu propria cameră.</p>
+              <p>Adaugi o fotografie cu propria cameră.</p>
             </div>
 
             <div className="infoCard">
               <div className="infoIcon">🎨</div>
               <h3>Alegi stilul</h3>
-              <p>
-                Poți selecta stilul modern, minimalist, luxury, boho sau
-                scandinav.
-              </p>
+              <p>Selectezi stilul dorit pentru amenajare.</p>
             </div>
 
             <div className="infoCard">
               <div className="infoIcon">🤖</div>
               <h3>Primești rezultat</h3>
-              <p>
-                Aplicația generează o idee de design adaptată stilului ales.
-              </p>
+              <p>Aplicația generează o idee de design și produse recomandate.</p>
             </div>
           </div>
         </section>
@@ -261,16 +309,8 @@ export default function Home() {
             font-family: Arial, sans-serif;
             color: #111;
             background:
-                radial-gradient(
-                    circle at top left,
-                    rgba(255, 255, 255, 0.95),
-                    transparent 35%
-                ),
-                radial-gradient(
-                    circle at top right,
-                    rgba(255, 223, 180, 0.8),
-                    transparent 30%
-                ),
+                radial-gradient(circle at top left, rgba(255, 255, 255, 0.95), transparent 35%),
+                radial-gradient(circle at top right, rgba(255, 223, 180, 0.8), transparent 30%),
                 linear-gradient(135deg, #f4eadb, #c9b08d);
           }
 
@@ -282,11 +322,17 @@ export default function Home() {
             margin-bottom: 50px;
           }
 
-          .heroContent {
+          .heroContent,
+          .visualCard,
+          .generator,
+          .howItWorks {
             background: rgba(255, 255, 255, 0.72);
             border-radius: 34px;
-            padding: 48px;
             box-shadow: 0 24px 60px rgba(0, 0, 0, 0.12);
+          }
+
+          .heroContent {
+            padding: 48px;
           }
 
           .tag {
@@ -296,7 +342,7 @@ export default function Home() {
             padding: 9px 16px;
             border-radius: 999px;
             font-size: 13px;
-            font-weight: 700;
+            font-weight: 800;
             margin-bottom: 22px;
           }
 
@@ -304,14 +350,12 @@ export default function Home() {
             font-size: 42px;
             line-height: 1.12;
             margin: 0 0 20px;
-            max-width: 850px;
           }
 
           .heroContent p {
             font-size: 18px;
             line-height: 1.6;
             color: #333;
-            max-width: 800px;
             margin-bottom: 26px;
           }
 
@@ -327,20 +371,9 @@ export default function Home() {
             padding: 15px 24px;
             border-radius: 18px;
             font-weight: 900;
-            transition: 0.2s;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            font-size: 15px;
             background: #111;
             color: white;
             box-shadow: 0 12px 25px rgba(0, 0, 0, 0.18);
-          }
-
-          .heroButtons a:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 14px 28px rgba(0, 0, 0, 0.16);
           }
 
           .stats {
@@ -354,7 +387,6 @@ export default function Home() {
             padding: 16px 22px;
             border-radius: 18px;
             min-width: 120px;
-            box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
           }
 
           .stats strong {
@@ -370,9 +402,6 @@ export default function Home() {
           .visualCard {
             position: relative;
             min-height: 430px;
-            background: rgba(255, 255, 255, 0.82);
-            border-radius: 34px;
-            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.14);
             padding: 26px;
             display: flex;
             align-items: center;
@@ -403,8 +432,6 @@ export default function Home() {
             text-align: center;
             position: relative;
             z-index: 1;
-            overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.8);
           }
 
           .roomIcon {
@@ -414,7 +441,6 @@ export default function Home() {
 
           .roomPreview p {
             font-weight: 800;
-            color: #111;
             font-size: 18px;
           }
 
@@ -425,9 +451,8 @@ export default function Home() {
             color: white;
             padding: 12px 18px;
             border-radius: 18px;
-            font-weight: 700;
+            font-weight: 800;
             box-shadow: 0 14px 30px rgba(0, 0, 0, 0.25);
-            animation: float 3s ease-in-out infinite;
           }
 
           .cardOne {
@@ -438,15 +463,11 @@ export default function Home() {
           .cardTwo {
             bottom: 52px;
             right: 30px;
-            animation-delay: 0.7s;
           }
 
           .generator,
           .howItWorks {
-            background: rgba(255, 255, 255, 0.55);
-            border-radius: 34px;
             padding: 36px;
-            box-shadow: 0 18px 45px rgba(0, 0, 0, 0.1);
             margin-bottom: 40px;
           }
 
@@ -530,12 +551,6 @@ export default function Home() {
             border-radius: 28px;
             padding: 34px;
             box-shadow: 0 14px 35px rgba(0, 0, 0, 0.11);
-            position: relative;
-            min-height: 270px;
-          }
-
-          .uploadCard {
-            background: linear-gradient(135deg, #ffffff, #fffaf4);
           }
 
           .step {
@@ -572,29 +587,30 @@ export default function Home() {
             cursor: pointer;
             font-weight: 800;
             border: 1px solid #ddd;
-            transition: 0.2s;
-            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.06);
-          }
-
-          .uploadBox:hover {
-            background: #ead9c2;
-            transform: translateY(-2px);
           }
 
           .uploadBox input {
             display: none;
           }
 
-          .uploadedStatus {
+          .uploadedStatus,
+          .emptyStatus {
             margin-top: 22px;
-            background: #f3fff5;
-            border: 1px solid #bfe8c6;
             border-radius: 20px;
             padding: 16px;
             display: flex;
             align-items: center;
             gap: 14px;
-            box-shadow: 0 10px 22px rgba(47, 125, 50, 0.08);
+          }
+
+          .uploadedStatus {
+            background: #f3fff5;
+            border: 1px solid #bfe8c6;
+          }
+
+          .emptyStatus {
+            background: #faf7f2;
+            border: 1px dashed #d7c5ad;
           }
 
           .statusIcon {
@@ -607,8 +623,6 @@ export default function Home() {
             align-items: center;
             justify-content: center;
             font-weight: 900;
-            font-size: 20px;
-            flex-shrink: 0;
           }
 
           .statusText {
@@ -619,30 +633,10 @@ export default function Home() {
 
           .statusText strong {
             color: #1f6b25;
-            font-size: 16px;
-            margin-bottom: 3px;
           }
 
           .statusText span {
             color: #4f6f52;
-            font-size: 14px;
-          }
-
-          .emptyStatus {
-            margin-top: 22px;
-            background: #faf7f2;
-            border: 1px dashed #d7c5ad;
-            border-radius: 18px;
-            padding: 14px 16px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            color: #6a5a48;
-          }
-
-          .emptyStatus p {
-            margin: 0;
-            color: #6a5a48;
             font-size: 14px;
           }
 
@@ -654,13 +648,6 @@ export default function Home() {
             border-radius: 14px;
             font-weight: 800;
             cursor: pointer;
-            transition: 0.2s;
-          }
-
-          .deleteImageBtn:hover {
-            background: #ffecec;
-            transform: translateY(-2px);
-            box-shadow: 0 10px 22px rgba(180, 35, 24, 0.12);
           }
 
           .controls {
@@ -685,15 +672,9 @@ export default function Home() {
             border-radius: 16px;
             background: #111;
             color: white;
-            font-weight: 800;
+            font-weight: 900;
             font-size: 15px;
             cursor: pointer;
-            transition: 0.2s;
-          }
-
-          button:hover:not(:disabled) {
-            transform: translateY(-3px);
-            box-shadow: 0 12px 25px rgba(0, 0, 0, 0.2);
           }
 
           button:disabled {
@@ -703,7 +684,7 @@ export default function Home() {
 
           .warning {
             color: #9a5b00 !important;
-            font-weight: 600;
+            font-weight: 700;
             margin-top: 16px;
           }
 
@@ -725,11 +706,6 @@ export default function Home() {
             padding: 28px;
             text-align: center;
             box-shadow: 0 14px 35px rgba(0, 0, 0, 0.1);
-            transition: 0.2s;
-          }
-
-          .infoCard:hover {
-            transform: translateY(-6px);
           }
 
           .infoIcon {
@@ -740,20 +716,6 @@ export default function Home() {
           .infoCard p {
             color: #555;
             line-height: 1.5;
-          }
-
-          @keyframes float {
-            0% {
-              transform: translateY(0);
-            }
-
-            50% {
-              transform: translateY(-10px);
-            }
-
-            100% {
-              transform: translateY(0);
-            }
           }
 
           @media (max-width: 900px) {
