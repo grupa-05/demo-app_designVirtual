@@ -72,20 +72,6 @@ export default function Produse() {
         fetchProducts();
     }, []);
 
-    function getImageUrl(imageUrl) {
-        if (!imageUrl) return "";
-
-        if (imageUrl.startsWith("http")) {
-            return imageUrl;
-        }
-
-        if (imageUrl.startsWith("/")) {
-            return `${API_URL}${imageUrl}`;
-        }
-
-        return `${API_URL}/${imageUrl}`;
-    }
-
     return (
         <main className="page">
             <Navbar />
@@ -126,7 +112,7 @@ export default function Produse() {
                             <div className="productImageBox">
                                 {product.imageUrl ? (
                                     <img
-                                        src={getImageUrl(product.imageUrl)}
+                                        src={`${API_URL}/${product.imageUrl}`}
                                         alt={product.name}
                                         className="productImage"
                                     />
