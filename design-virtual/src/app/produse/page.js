@@ -79,7 +79,11 @@ export default function Produse() {
             return imageUrl;
         }
 
-        return `${API_URL}${imageUrl}`;
+        if (imageUrl.startsWith("/")) {
+            return `${API_URL}${imageUrl}`;
+        }
+
+        return `${API_URL}/${imageUrl}`;
     }
 
     return (
@@ -92,7 +96,8 @@ export default function Produse() {
                 <h1>Produse recomandate 🛒</h1>
 
                 <p>
-                    Aici sunt afișate produsele sugerate pentru designul generat.
+                    Aici sunt afișate produsele recomandate pentru designul generat.
+                    Produsele sunt preluate automat pe baza rezultatului primit de la AI.
                 </p>
             </section>
 
@@ -126,7 +131,9 @@ export default function Produse() {
                                         className="productImage"
                                     />
                                 ) : (
-                                    <div className="productIcon">🛋️</div>
+                                    <div className="noImage">
+                                        <span>Imagine indisponibilă</span>
+                                    </div>
                                 )}
                             </div>
 
@@ -188,8 +195,16 @@ export default function Produse() {
                     font-family: Arial, sans-serif;
                     color: #111;
                     background:
-                            radial-gradient(circle at top left, rgba(255, 255, 255, 0.95), transparent 35%),
-                            radial-gradient(circle at top right, rgba(255, 223, 180, 0.8), transparent 30%),
+                            radial-gradient(
+                                    circle at top left,
+                                    rgba(255, 255, 255, 0.95),
+                                    transparent 35%
+                            ),
+                            radial-gradient(
+                                    circle at top right,
+                                    rgba(255, 223, 180, 0.8),
+                                    transparent 30%
+                            ),
                             linear-gradient(135deg, #f4eadb, #c9b08d);
                 }
 
@@ -256,7 +271,7 @@ export default function Produse() {
                 }
 
                 .productCard {
-                    background: rgba(255, 255, 255, 0.82);
+                    background: rgba(255, 255, 255, 0.86);
                     border-radius: 28px;
                     overflow: hidden;
                     box-shadow: 0 18px 45px rgba(0, 0, 0, 0.1);
@@ -271,22 +286,30 @@ export default function Produse() {
                 }
 
                 .productImageBox {
-                    height: 210px;
+                    height: 240px;
                     background: linear-gradient(135deg, #ffffff, #f3eadf);
                     display: flex;
                     align-items: center;
                     justify-content: center;
+                    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
                 }
 
                 .productImage {
                     width: 100%;
                     height: 100%;
                     object-fit: contain;
-                    padding: 18px;
+                    padding: 20px;
                 }
 
-                .productIcon {
-                    font-size: 70px;
+                .noImage {
+                    width: 100%;
+                    height: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #777;
+                    font-weight: 800;
+                    text-align: center;
                 }
 
                 .productInfo {
